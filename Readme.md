@@ -1,0 +1,1 @@
+Study notes and Code reproduction of https://github.com/karpathy/makemore
