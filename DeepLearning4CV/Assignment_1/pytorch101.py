@@ -27,7 +27,9 @@ def create_sample_tensor() -> Tensor:
     #                     TODO: Implement this function                      #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    x = torch.zeros(3, 2)
+    x[0,1] = 10
+    x[1,0] = 100
     ###########################################################################
     #                            END OF YOUR CODE                             #
     ###########################################################################
@@ -62,7 +64,8 @@ def mutate_tensor(
     #                     TODO: Implement this function                      #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    for i in range(len(indices)):
+        x[indices[i]] = values[i]
     ##########################################################################
     #                            END OF YOUR CODE                            #
     ##########################################################################
@@ -91,7 +94,9 @@ def count_tensor_elements(x: Tensor) -> int:
     #   You CANNOT use the built-in functions torch.numel(x) or x.numel().   #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    num_elements = 1
+    for i in range(len(x.shape)):
+        num_elements *= x.shape[i]
     ##########################################################################
     #                            END OF YOUR CODE                            #
     ##########################################################################
@@ -113,7 +118,7 @@ def create_tensor_of_pi(M: int, N: int) -> Tensor:
     #         TODO: Implement this function. It should take one line.        #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    x=torch.full((M,N),3.14)
     ##########################################################################
     #                            END OF YOUR CODE                            #
     ##########################################################################
@@ -139,7 +144,13 @@ def multiples_of_ten(start: int, stop: int) -> Tensor:
     #                      TODO: Implement this function                     #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    next_ten =  start if start % 10 == 0 else start//10*10+10
+    last_ten = stop//10*10
+    if next_ten > last_ten:
+        x = torch.tensor((), dtype=torch.float64)
+    else:
+        x = torch.arange(next_ten, last_ten+1, 10, dtype=torch.float64)
+            
     ##########################################################################
     #                            END OF YOUR CODE                            #
     ##########################################################################
