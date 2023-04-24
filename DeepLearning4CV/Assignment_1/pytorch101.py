@@ -189,7 +189,11 @@ def slice_indexing_practice(x: Tensor) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
     #                      TODO: Implement this function                     #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    last_row = x[-1]
+    third_col = x[:, 2:3]
+    first_two_rows_three_cols = x[0:2, 0:3]
+    even_rows_odd_cols = x[::2, 1::2]
+    
     ##########################################################################
     #                            END OF YOUR CODE                            #
     ##########################################################################
@@ -232,7 +236,12 @@ def slice_assignment_practice(x: Tensor) -> Tensor:
     #                      TODO: Implement this function                     #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    x[:4, :6] = torch.tensor(
+        [[0, 1, 2, 2, 2, 2],
+        [0, 1, 2, 2, 2, 2],
+        [3, 4, 3, 4, 5, 5],
+        [3, 4, 3, 4, 5, 5]]
+    )
     ##########################################################################
     #                            END OF YOUR CODE                            #
     ##########################################################################
@@ -260,7 +269,8 @@ def shuffle_cols(x: Tensor) -> Tensor:
     #                      TODO: Implement this function                     #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    pos = torch.tensor([0,0,2,1])
+    y = x[: ,pos]
     ##########################################################################
     #                            END OF YOUR CODE                            #
     ##########################################################################
@@ -290,7 +300,7 @@ def reverse_rows(x: Tensor) -> Tensor:
     #                      TODO: Implement this function                     #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    y = x[torch.arange(x.shape[0]-1, -1, -1),:]
     ##########################################################################
     #                            END OF YOUR CODE                            #
     ##########################################################################
@@ -319,7 +329,7 @@ def take_one_elem_per_col(x: Tensor) -> Tensor:
     #                      TODO: Implement this function                     #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    y=torch.tensor([x[1,0],x[0,1],x[3,2] ])
     ##########################################################################
     #                            END OF YOUR CODE                            #
     ##########################################################################
@@ -347,7 +357,8 @@ def make_one_hot(x: List[int]) -> Tensor:
     #                      TODO: Implement this function                     #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    y = torch.zeros((len(x), max(x)+1))
+    y[torch.arange(len(x)), x] = 1
     ##########################################################################
     #                            END OF YOUR CODE                            #
     ##########################################################################
