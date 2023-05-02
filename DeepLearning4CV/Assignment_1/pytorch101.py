@@ -599,7 +599,22 @@ def normalize_columns(x: Tensor) -> Tensor:
     #                      TODO: Implement this function                     #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    
+    # x.shape 3,4
+    sum_of_col = x.sum(dim=0) # 4
+    mean_of_col = sum_of_col / x.shape[0] # 4,
+    diff_of_mean = x - mean_of_col  # 3,4 
+                                    #  ,4
+    orginal_diff_of_mean = diff_of_mean.clone()
+    power_of_diff_mean = diff_of_mean**2 # 3,4
+    sumed_power_of_diff_mean = power_of_diff_mean.sum(dim=0) # 4,
+    var_ = sumed_power_of_diff_mean  / (x.shape[0] - 1) # 4,
+    std = torch.sqrt(var_) # 4
+    
+    y = orginal_diff_of_mean / std
+
+    
+    
     ##########################################################################
     #                            END OF YOUR CODE                            #
     ##########################################################################
