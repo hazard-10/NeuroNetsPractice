@@ -1,14 +1,18 @@
 import torch
 
-# Create a tensor with a singleton dimension
-a = torch.randn(1, 3, 4)
+B, N, M, P = 2, 3, 5, 4
+x = torch.randn(B, N, M)
+y = torch.randn(B, M, P)
+z = torch.randn(B, N, P)
 
-# Remove all singleton dimensions
-squeezed_tensor = a.squeeze()
+z[0] = x[1] @ y[1]
+# print(x[1].shape, y[1].shape , (x[1] @ y[1]).shape, z[0] == x[1] @ y[1])
 
-# Remove a specific singleton dimension (e.g., dimension 0)
-squeezed_tensor_dim0 = a.squeeze(0)
+x = torch.tensor([[1,2],[2,3]])
+y = torch.tensor([[3,4],[4,5]])
+print(x @ y)
+print(x.mm(y))
 
-print("Original tensor shape:", a.shape)
-print("Squeezed tensor shape:", squeezed_tensor.shape)
-print("Squeezed tensor (dim 0) shape:", squeezed_tensor_dim0.shape)
+x = torch.rand(3,4)
+y = torch.rand(3,4)
+print(torch.stack((x,y), dim = 2).shape)

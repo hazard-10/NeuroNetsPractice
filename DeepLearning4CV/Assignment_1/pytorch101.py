@@ -439,7 +439,7 @@ def reshape_practice(x: Tensor) -> Tensor:
 def zero_row_min(x: Tensor) -> Tensor:
     """
     Return a copy of the input tensor x, where the minimum value along each row
-    has been set to 0.
+    has  0been set to.
 
     For example, if x is:
     x = torch.tensor([
@@ -468,7 +468,13 @@ def zero_row_min(x: Tensor) -> Tensor:
     #                      TODO: Implement this function                     #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    
+    x.shape
+    min_row_val, min_row_index = x.min(dim=1) # index shape 2,
+    y = x.clone()
+    y[torch.arange(x.shape[0]), min_row_index] = 0
+    
+    
     ##########################################################################
     #                            END OF YOUR CODE                            #
     ##########################################################################
@@ -524,7 +530,10 @@ def batched_matrix_multiply_loop(x: Tensor, y: Tensor) -> Tensor:
     #                      TODO: Implement this function                      #
     ###########################################################################
     # Replace "pass" statement with your code
-    pass
+    z = torch.randn((x.shape[0], x.shape[1], y.shape[2]))
+    
+    for i in range(z.shape[0]):
+        z[i] = x[i] @ y[i]
     ###########################################################################
     #                           END OF YOUR CODE                              #
     ###########################################################################
@@ -555,7 +564,7 @@ def batched_matrix_multiply_noloop(x: Tensor, y: Tensor) -> Tensor:
     #                      TODO: Implement this function                      #
     ###########################################################################
     # Replace "pass" statement with your code
-    pass
+    z = x.bmm(y)
     ###########################################################################
     #                            END OF YOUR CODE                             #
     ###########################################################################
