@@ -60,7 +60,9 @@ def compute_distances_two_loops(x_train: torch.Tensor, x_test: torch.Tensor):
     # functions from torch.nn or torch.nn.functional.                        #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    for i in range(num_train):
+        for j in range(num_test):
+            dists[i,j] = (((x_train[i] - x_test[j])**2).sum())**(1/2)
     ##########################################################################
     #                           END OF YOUR CODE                             #
     ##########################################################################
@@ -104,7 +106,13 @@ def compute_distances_one_loop(x_train: torch.Tensor, x_test: torch.Tensor):
     # functions from torch.nn or torch.nn.functional.                        #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    train_reshape = x_train.reshape(num_train, 1, int(x_train.numel()/num_train))
+    test_reshape = x_test.reshape(1, num_test, int(x_train.numel()/num_train))
+    exp_diff = (train_reshape - test_reshape)**2
+    sum_exp_diff = exp_diff.sum(2)
+    sqrt_sum_exp = sum_exp_diff**(1/2)
+    dists = sqrt_sum_exp
+
     ##########################################################################
     #                           END OF YOUR CODE                             #
     ##########################################################################
@@ -156,7 +164,22 @@ def compute_distances_no_loops(x_train: torch.Tensor, x_test: torch.Tensor):
     #       and a matrix multiply.                                           #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    num_train = x_train.shape[0]
+    num_test = x_test.shape[0]
+    dists = x_train.new_zeros(num_train, num_test)
+    ##########################################################################
+    # TODO: Implement this function using only a single loop over x_train.   #
+    #                                                                        #
+    # You may not use torch.norm (or its instance method variant), nor any   #
+    # functions from torch.nn or torch.nn.functional.                        #
+    ##########################################################################
+    # Replace "pass" statement with your code
+    train_reshape = x_train.reshape(num_train, 1, int(x_train.numel()/num_train))
+    test_reshape = x_test.reshape(1, num_test, int(x_train.numel()/num_train))
+    # exp_diff = (train_reshape - test_reshape)**2
+    # sum_exp_diff = exp_diff.sum(2)
+    sqrt_sum_exp = (((train_reshape - test_reshape)**2).sum(2))**(1/2)
+    dists = sqrt_sum_exp
     ##########################################################################
     #                           END OF YOUR CODE                             #
     ##########################################################################
@@ -199,7 +222,12 @@ def predict_labels(dists: torch.Tensor, y_train: torch.Tensor, k: int = 1):
     # HINT: Look up the function torch.topk                                  #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    sorted_tensor, indices = dists.sort(dim = 0)
+    print(indices)
+    indices_emb = y_train[indices]
+    indices, _ = (indices_emb[:k,]).sort(dim = 0)
+    print(indices)
+    y_pred, _ = indices.mode(dim=0)
     ##########################################################################
     #                           END OF YOUR CODE                             #
     ##########################################################################
@@ -223,7 +251,8 @@ class KnnClassifier:
         # `self.x_train` and `self.y_train`, accordingly.                    #
         ######################################################################
         # Replace "pass" statement with your code
-        pass
+        self.x_train = x_train
+        self.y_train = y_train
         ######################################################################
         #                         END OF YOUR CODE                           #
         ######################################################################
@@ -247,7 +276,7 @@ class KnnClassifier:
         # to predict output labels.                                          #
         ######################################################################
         # Replace "pass" statement with your code
-        pass
+        y_test_pred = predict_labels(compute_distances_no_loops(self.x_train, self.y_train), x_test, k)
         ######################################################################
         #                         END OF YOUR CODE                           #
         ######################################################################
@@ -321,7 +350,8 @@ def knn_cross_validate(
     # HINT: torch.chunk                                                      #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    x_train_folds = [x_train.chunk(num_folds)]
+    y_train_folds = [y_train.chunk(num_folds)]
     ##########################################################################
     #                           END OF YOUR CODE                             #
     ##########################################################################

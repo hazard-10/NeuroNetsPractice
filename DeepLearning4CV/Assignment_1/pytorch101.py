@@ -661,7 +661,10 @@ def mm_on_gpu(x: Tensor, w: Tensor) -> Tensor:
     #                      TODO: Implement this function                     #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    x = x.cuda()
+    w = w.cuda()
+    y = x @ w
+    y = y.cpu()
     ##########################################################################
     #                            END OF YOUR CODE                            #
     ##########################################################################
