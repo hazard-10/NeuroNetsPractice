@@ -169,7 +169,10 @@ def svm_loss_naive(
                 # at the same time that the loss is being computed.                   #
                 #######################################################################
                 # Replace "pass" statement with your code
-                pass
+                
+                dW[:, j] += X[i] 
+                dW[:, y[i]] -= X[i] 
+                
                 #######################################################################
                 #                       END OF YOUR CODE                              #
                 #######################################################################
@@ -177,17 +180,19 @@ def svm_loss_naive(
     # Right now the loss is a sum over all training examples, but we want it
     # to be an average instead so we divide by num_train.
     loss /= num_train
-
+    dW /= num_train
     # Add regularization to the loss.
     loss += reg * torch.sum(W * W)
-
+    dW += 2 * reg * W
     #############################################################################
     # TODO:                                                                     #
     # Compute the gradient of the loss function w.r.t. the regularization term  #
     # and add it to dW. (part 2)                                                #
     #############################################################################
     # Replace "pass" statement with your code
-    pass
+    
+    # dW += reg * W
+    
     #############################################################################
     #                             END OF YOUR CODE                              #
     #############################################################################
@@ -216,32 +221,54 @@ def svm_loss_vectorized(
     """
     loss = 0.0
     dW = torch.zeros_like(W)  # initialize the gradient as zero
-
-    #############################################################################
-    # TODO:                                                                     #
-    # Implement a vectorized version of the structured SVM loss, storing the    #
-    # result in loss.                                                           #
-    #############################################################################
-    # Replace "pass" statement with your code
-    pass
-    #############################################################################
-    #                             END OF YOUR CODE                              #
-    #############################################################################
-
-    #############################################################################
-    # TODO:                                                                     #
-    # Implement a vectorized version of the gradient for the structured SVM     #
-    # loss, storing the result in dW.                                           #
-    #                                                                           #
-    # Hint: Instead of computing the gradient from scratch, it may be easier    #
-    # to reuse some of the intermediate values that you used to compute the     #
-    # loss.                                                                     #
-    #############################################################################
-    # Replace "pass" statement with your code
-    pass
-    #############################################################################
-    #                             END OF YOUR CODE                              #
-    #############################################################################
+    
+    '''
+    W.shape (3073, 10))
+    dW.shape (3073, 10))
+    X.shape (10000, 3073)
+    y.shape (10000,)
+    '''
+    
+    # compute the loss and the gradient
+    num_classes = W.shape[1] # 10
+    num_train = X.shape[0] # 10000
+    loss = 0.0
+    
+    scores_vec = X @ W # all scores, shape (10000, 10)
+    
+    # Y contains the column index of the correct class
+    # pluck out the correct scores
+    correct_score = scores_vec[torch.arange(num_train), y].view(-1,1) # (10000,1)
+    correct_score_col = correct_score.view(-1,1) # (10000,1)
+    
+    '''for non-correct scores, subtract correct score and add 1
+       if remianing score > 0, add to loss, update dW
+    '''
+    # 1. subtract 1 to correct score, shape (10000, 10)
+    scores_vec[torch.arange(num_train), y] -=1
+    # 2. calculate the margin on all scores, shape (10000, 10) correct should be 0
+    scores_vec = scores_vec - correct_score_col + 1
+    # 3. map out indices that margin being larger than 0
+    # row index is the image index, col index is the class index
+    incorrect_index = (scores_vec > 0).nonzero() # [[row, col], 
+                                                 #  [row, col], ...]
+    '''
+    subtract gradient[class_index] by the accoridng image
+    add gradient[correct_class_index] by the according image
+    '''
+    
+    #. dw shape(3073, 10), should accept size (3073, 1), 
+    #  X[incorrect_index[:, 0]] shape (1, 3073)
+    dW[:, incorrect_index[:, 1]] += (X[incorrect_index[:, 0]]).t() 
+    dW[:, y[incorrect_index[:, 1]]] -= (X[incorrect_index[:, 0]]).t() # (x, 3073)
+    
+    # sum up the remaining margin
+    loss += torch.sum(scores_vec[scores_vec > 0])    
+    loss /= num_train
+    loss += reg * torch.sum(W * W)
+    # compute the gradient with respect to reg
+    dW /= num_train
+    dW += reg * W
 
     return loss, dW
 
