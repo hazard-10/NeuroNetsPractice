@@ -237,67 +237,22 @@ def svm_loss_vectorized(
     correct_score = (scores_vec[torch.arange(num_train), y]).clone() # (10000,1)
     correct_score_col = correct_score.view(-1,1) # (10000,1)
     
-    '''for non-correct scores, subtract correct score and add 1
-       if remianing score > 0, add to loss, update dW
-    '''
     # 1. subtract 1 to correct score, shape (10000, 10)
     # 2. calculate the margin on all scores, shape (10000, 10) correct should be 0
     scores_vec = scores_vec - correct_score_col + 1
     scores_vec[torch.arange(num_train), y] = 0
     
-    
-    # sum up the remaining margin
+    # calculate loss
     loss += torch.sum(scores_vec[scores_vec > 0])
     loss /= num_train
     loss += reg * torch.sum(W * W)
-    
-    # 3. map out indices that margin being larger than 0
-    # row index is the image index, col index is the class index
     
     scores_vec[scores_vec > 0] = 1 # (10000, 10)
     scores_vec[scores_vec < 0] = 0 # (10000, 10)
     scores_vec[torch.arange(num_train), y] = scores_vec.sum(dim=1) * -1 
     dW = X.t() @ scores_vec # (3073, 10)
     
-    '''
-    subtract gradient[class_index] by the accoridng image
-    add gradient[correct_class_index] by the according image
-    '''
-    
-    #. dw shape(3073, 10), should accept size (3073, 1), 
-    #  X[incorrect_index[:, 0]] shape (1, 3073)
-    
-    # dW[:, incorrect_index_col] += (X[incorrect_index_row]).t()
-    # dW[:, y[incorrect_index_row]] -= (X[incorrect_index_row]).t() # (x, 3073)
-    
-    '''
-    tmp
-    '''
-    
-    
-    # for t in incorrect_index:
-    #     i = t[0]
-    #     j = t[1]
-    #     dW[:, j] += X[i] 
-    #     dW[:, y[i]] -= X[i]
-    
-    
-    '''
-    for i in range(num_train): # for each image
-        scores = W.t().mv(X[i]) # calculate the score for each class, result a siz 10 vector
-        correct_class_score = scores[y[i]] # get the score for the correct class
-        for j in range(num_classes): # for each class
-            if j == y[i]: # skip the correct class
-                continue
-            margin = scores[j] - correct_class_score + 1  # note delta = 1
-            if margin > 0:
-                loss += margin # accumulate the loss
-                dW[:, j] += X[i] # accumulate the gradient for incorrect classes
-                dW[:, y[i]] -= X[i] # accumulate the gradient for correct class
-    '''
-    
     dW /= num_train
-    
     # Add regularization to the loss.
     dW += 2 * reg * W
     return loss, dW
@@ -320,7 +275,12 @@ def sample_batch(
     # Hint: Use torch.randint to generate indices.                          #
     #########################################################################
     # Replace "pass" statement with your code
-    pass
+    
+    # X : N x D
+    indices = torch.randint(0, num_train, (batch_size,))
+    X_batch = X[indices]
+    y_batch = y[indices]
+    
     #########################################################################
     #                       END OF YOUR CODE                                #
     #########################################################################
@@ -388,7 +348,7 @@ def train_linear_classifier(
         # Update the weights using the gradient and the learning rate.          #
         #########################################################################
         # Replace "pass" statement with your code
-        pass
+        W -= learning_rate * grad
         #########################################################################
         #                       END OF YOUR CODE                                #
         #########################################################################
@@ -419,7 +379,7 @@ def predict_linear_classifier(W: torch.Tensor, X: torch.Tensor):
     # Implement this method. Store the predicted labels in y_pred.            #
     ###########################################################################
     # Replace "pass" statement with your code
-    pass
+    y_pred = torch.argmax(X @ W, dim=1)
     ###########################################################################
     #                           END OF YOUR CODE                              #
     ###########################################################################
@@ -438,8 +398,8 @@ def svm_get_search_params():
                                 e.g. [1e0, 1e1, ...]
     """
 
-    learning_rates = []
-    regularization_strengths = []
+    learning_rates = [0.01, 0.008, 0.001, 0.002, 0.005]
+    regularization_strengths = [0.01,0.001, 0.0001, 0.00001, 0.000001]
 
     ###########################################################################
     # TODO:   add your own hyper parameter lists.                             #
@@ -497,7 +457,13 @@ def test_one_param_set(
     # num_iters = 100
 
     # Replace "pass" statement with your code
-    pass
+    cls.train(data_dict["X_train"], data_dict["y_train"], lr, reg, num_iters)
+    
+    y_train_pred = cls.predict(data_dict["X_train"])
+    train_acc = 100.0 * (data_dict['y_train'] == y_train_pred).double().mean().item()
+    
+    y_val_pred = cls.predict(data_dict["X_val"])
+    val_acc = 100.0 * (data_dict['y_val'] == y_val_pred).double().mean().item()
     ############################################################################
     #                            END OF YOUR CODE                              #
     ############################################################################
