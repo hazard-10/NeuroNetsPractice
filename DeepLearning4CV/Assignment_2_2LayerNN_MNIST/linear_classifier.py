@@ -243,13 +243,22 @@ def svm_loss_vectorized(
     # 1. subtract 1 to correct score, shape (10000, 10)
     # 2. calculate the margin on all scores, shape (10000, 10) correct should be 0
     scores_vec = scores_vec - correct_score_col + 1
-    scores_vec[torch.arange(num_train), y] -=1
+    scores_vec[torch.arange(num_train), y] = 0
+    
+    
+    # sum up the remaining margin
+    loss += torch.sum(scores_vec[scores_vec > 0])
+    loss /= num_train
+    loss += reg * torch.sum(W * W)
+    
     # 3. map out indices that margin being larger than 0
     # row index is the image index, col index is the class index
-    incorrect_index = (scores_vec > 0).nonzero() # [[row, col], 
-                                                 #  [row, col], ...]
-    incorrect_index_row = incorrect_index[:, 0] # (x,)
-    incorrect_index_col = incorrect_index[:, 1] # (x,)
+    
+    scores_vec[scores_vec > 0] = 1 # (10000, 10)
+    scores_vec[scores_vec < 0] = 0 # (10000, 10)
+    scores_vec[torch.arange(num_train), y] = scores_vec.sum(dim=1) * -1 
+    dW = X.t() @ scores_vec # (3073, 10)
+    
     '''
     subtract gradient[class_index] by the accoridng image
     add gradient[correct_class_index] by the according image
@@ -258,34 +267,20 @@ def svm_loss_vectorized(
     #. dw shape(3073, 10), should accept size (3073, 1), 
     #  X[incorrect_index[:, 0]] shape (1, 3073)
     
-    dW[:, incorrect_index_col] += (X[incorrect_index_row]).t()
-    dW[:, y[incorrect_index_row]] -= (X[incorrect_index_row]).t() # (x, 3073)
+    # dW[:, incorrect_index_col] += (X[incorrect_index_row]).t()
+    # dW[:, y[incorrect_index_row]] -= (X[incorrect_index_row]).t() # (x, 3073)
     
     '''
     tmp
     '''
     
-    # for i in range(num_train):
-    #     scores = W.t().mv(X[i])
-    #     correct_class_score = scores[y[i]]
-    #     for j in range(num_classes):
-    #         if scores[j] - correct_class_score == 0:
-    #             scores[j] -= 1
-    #         if scores[j] - correct_class_score == 0:
-    #             continue
-    #         margin = scores[j] - correct_class_score + 1  # note delta = 1
-    #         if margin > 0:
-    #             dW[:, j] += X[i] 
-                # dW[:, y[i]] -= X[i] 
     
-    for t in incorrect_index:
-        i = t[0]
-        j = t[1]
-        dW[:, j] += X[i] 
-        dW[:, y[i]] -= X[i]
+    # for t in incorrect_index:
+    #     i = t[0]
+    #     j = t[1]
+    #     dW[:, j] += X[i] 
+    #     dW[:, y[i]] -= X[i]
     
-    # sum up the remaining margin
-    loss += torch.sum(scores_vec[scores_vec > 0])
     
     '''
     for i in range(num_train): # for each image
@@ -301,11 +296,9 @@ def svm_loss_vectorized(
                 dW[:, y[i]] -= X[i] # accumulate the gradient for correct class
     '''
     
-    loss /= num_train
     dW /= num_train
     
     # Add regularization to the loss.
-    loss += reg * torch.sum(W * W)
     dW += 2 * reg * W
     return loss, dW
 
