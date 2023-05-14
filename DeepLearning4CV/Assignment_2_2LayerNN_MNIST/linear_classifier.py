@@ -509,8 +509,26 @@ def softmax_loss_naive(
     # in http://cs231n.github.io/linear-classify/). Plus, don't forget the      #
     # regularization!                                                           #
     #############################################################################
-    # Replace "pass" statement with your code
-    pass
+    
+    num_train = X.shape[0]
+    num_classes = W.shape[1]
+    
+    for i in range(num_train):
+        grad = 0
+        scores_i = W.T.mv(X[i]) # C
+        grad+= X[i]
+        
+        max_val = scores_i.max().item()
+        scores_normalize = scores_i - max_val
+        
+        scores_exp = scores_normalize.exp() # C
+        probs = scores_exp / scores_exp.sum() # C
+        
+        labelled_prob = probs[y[i]]
+        loss += -1 * labelled_prob.log()
+    
+    loss /= num_train
+    dW /= num_train
     #############################################################################
     #                          END OF YOUR CODE                                 #
     #############################################################################
@@ -540,7 +558,27 @@ def softmax_loss_vectorized(
     # regularization!                                                           #
     #############################################################################
     # Replace "pass" statement with your code
-    pass
+    num_train = X.shape[0]
+    num_classes = W.shape[1]
+    
+    scores = X @ W # N,C
+    scores_normalize = scores - scores.max(dim=1, keepdim=True)[0] # prevent scores getting too large after exp
+    scores_exp = scores_normalize.exp()
+    prob = scores_exp / scores_exp.sum(dim=1, keepdims = True ) # N,C
+    
+    label_prob = prob[torch.arange(num_train), y]
+    neg_log_like = -1 * label_prob.log()
+    loss = neg_log_like.sum() / num_train
+    
+    dscore = prob
+    dscore[torch.arange(num_train), y] -= 1
+
+    dW = X.T.matmul(dscore)
+    
+    dW /= num_train
+    
+    loss += reg * torch.sum(W * W)
+    dW += 2 * reg * W
     #############################################################################
     #                          END OF YOUR CODE                                 #
     #############################################################################
@@ -559,8 +597,16 @@ def softmax_get_search_params():
     - regularization_strengths: regularization strengths candidates
                                 e.g. [1e0, 1e1, ...]
     """
-    learning_rates = []
-    regularization_strengths = []
+    learning_rates = [10,
+                      1,
+                      .1,
+                      .01,
+                      .001]
+    regularization_strengths = [1,
+                                0.1,
+                                0.01,
+                                0.001,
+                                0.0001]
 
     ###########################################################################
     # TODO: Add your own hyper parameter lists. This should be similar to the #
