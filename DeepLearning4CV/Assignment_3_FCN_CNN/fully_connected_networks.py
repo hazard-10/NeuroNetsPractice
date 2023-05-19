@@ -205,10 +205,10 @@ class TwoLayerNet(object):
         # weights and biases using the keys 'W2' and 'b2'.                #
         ###################################################################
         # Replace "pass" statement with your code
-        W1 = torch.randn(input_dim, hidden_dim) * weight_scale
-        b1 = torch.zeros(hidden_dim)
-        W2 = torch.randn(hidden_dim, num_classes) * weight_scale
-        b2 = torch.zeros(num_classes)
+        W1 = torch.randn(input_dim, hidden_dim, dtype = dtype, device = device) * weight_scale
+        b1 = torch.zeros(hidden_dim, dtype = dtype, device = device)
+        W2 = torch.randn(hidden_dim, num_classes, dtype = dtype, device = device) * weight_scale
+        b2 = torch.zeros(num_classes, dtype = dtype, device = device)
         self.params = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
         ###############################################################
         #                            END OF YOUR CODE                 #
@@ -269,7 +269,6 @@ class TwoLayerNet(object):
         out_linear_relu, cache_linearRelu = Linear_ReLU.forward(X, self.params["W1"], self.params["b1"])
         out_2nd_linear, cache_linear = Linear.forward(out_linear_relu, self.params["W2"], self.params["b2"] )
         scores = out_2nd_linear
-        
         ##############################################################
         #                     END OF YOUR CODE                       #
         ##############################################################
@@ -367,7 +366,27 @@ class FullyConnectedNet(object):
         # should be initialized to zero.                                      #
         #######################################################################
         # Replace "pass" statement with your code
-        pass
+        
+        # for i, t in enumerate(hidden_dims):
+        #     if i == 0:
+        #         self.params["W1"] = torch.randn(input_dim, t, device=device, dtype=dtype) * weight_scale
+        #         self.params["b1"] = torch.zeros(t, device=device, dtype=dtype)
+        #     else:
+        #         self.params["W"+str(i+1)] = torch.randn(hidden_dims[i-1], t, device=device, dtype=dtype) * weight_scale
+        #         self.params["b"+str(i+1)] = torch.zeros(t, device=device, dtype=dtype)
+        
+        for i, hid in enumerate(hidden_dims):
+            if i == 0:
+                self.params["W1"] = torch.randn(input_dim, hid, device=device, dtype=dtype) * weight_scale
+                self.params["b1"] = torch.zeros(hid, device=device, dtype=dtype)
+            else:
+                self.params["W"+str(i+1)] = torch.randn(hidden_dims[i-1], hid, device=device, dtype=dtype) * weight_scale
+                self.params["b"+str(i+1)] = torch.zeros(hid, device=device, dtype=dtype)
+        
+        self.params["W"+str(self.num_layers)] = torch.randn(hidden_dims[-1], num_classes, device=device, dtype=dtype) * weight_scale
+        self.params["b"+str(self.num_layers)] = torch.zeros(num_classes, device=device, dtype=dtype)
+          
+        
         #######################################################################
         #                         END OF YOUR CODE                            #
         #######################################################################
@@ -431,7 +450,25 @@ class FullyConnectedNet(object):
         # to each dropout forward pass.                                  #
         ##################################################################
         # Replace "pass" statement with your code
-        pass
+        
+        out_linearRelu_list = []
+        cache_linearRelu_list = []
+        for i in range(1, self.num_layers+1):
+            if i == 1:
+                out_linearRelu, cache_linearRelu = Linear_ReLU.forward(X, 
+                                                                       self.params["W1"], 
+                                                                       self.params["b1"])
+            else:
+                out_linearRelu, cache_linearRelu = Linear_ReLU.forward(out_linearRelu_list[-1], 
+                                                                       self.params["W"+str(i)], 
+                                                                       self.params["b"+str(i)])
+            out_linearRelu_list.append(out_linearRelu)
+            cache_linearRelu_list.append(cache_linearRelu)
+        out_last_linear, cache_last_linear = Linear.forward(out_linearRelu_list[-1],
+                                                            self.params["W"+str(self.num_layers)],
+                                                            self.params["b"+str(self.num_layers)])
+        scores = out_last_linear
+          
         #################################################################
         #                      END OF YOUR CODE                         #
         #################################################################
@@ -453,7 +490,12 @@ class FullyConnectedNet(object):
         # the gradient.                                                     #
         #####################################################################
         # Replace "pass" statement with your code
-        pass
+      
+        loss, d_softmax = softmax_loss(scores, y)
+        
+        # add regularization
+        for i in range(1, self.num_layers+1):
+            loss += 0.5 * self.reg * torch.sum(self.params["W"+str(i)]**2)
         ###########################################################
         #                   END OF YOUR CODE                      #
         ###########################################################
@@ -469,7 +511,27 @@ def create_solver_instance(data_dict, dtype, device):
     #############################################################
     solver = None
     # Replace "pass" statement with your code
-    pass
+    
+    # change y dtype to int
+    data_dict['y_train'] = data_dict['y_train'].type(torch.int64)
+    data_dict['y_val'] = data_dict['y_val'].type(torch.int64)
+    data_dict['y_test'] = data_dict['y_test'].type(torch.int64)
+    
+    for k, v in data_dict.items():
+      print('%s: ' % k, v.device, v.dtype)
+    
+    
+      
+    
+    solver = Solver(model, data_dict,
+                    update_rule=sgd,
+                    optim_config={'learning_rate': 0.9,},
+                    lr_decay=0.94,
+                    num_epochs=30, 
+                    batch_size=1000,
+                    print_every=100,
+                    device="cuda:0")
+    
     ##############################################################
     #                    END OF YOUR CODE                        #
     ##############################################################
@@ -648,7 +710,7 @@ class Dropout(object):
         - out: Tensor of the same shape as x.
         - cache: tuple (dropout_param, mask). In training mode, mask
           is the dropout mask that was used to multiply the input; in
-          test mode, mask is None.
+          test mode, mask is None.   
         NOTE: Please implement **inverted** dropout, not the vanilla
               version of dropout.
         See http://cs231n.github.io/neural-networks-2/#reg for more details.
