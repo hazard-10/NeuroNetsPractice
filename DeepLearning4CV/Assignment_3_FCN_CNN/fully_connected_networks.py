@@ -453,7 +453,7 @@ class FullyConnectedNet(object):
         
         out_linearRelu_list = []
         cache_linearRelu_list = []
-        for i in range(1, self.num_layers+1):
+        for i in range(1, self.num_layers):
             if i == 1:
                 out_linearRelu, cache_linearRelu = Linear_ReLU.forward(X, 
                                                                        self.params["W1"], 
@@ -492,10 +492,28 @@ class FullyConnectedNet(object):
         # Replace "pass" statement with your code
       
         loss, d_softmax = softmax_loss(scores, y)
-        
         # add regularization
         for i in range(1, self.num_layers+1):
             loss += 0.5 * self.reg * torch.sum(self.params["W"+str(i)]**2)
+        
+        # backward the last linear layer
+        dx_linear, dw_linear, db_linear = Linear.backward(d_softmax, cache_last_linear)
+        grads["W"+str(self.num_layers)] = dw_linear + self.reg * self.params["W"+str(self.num_layers)]
+        grads["b"+str(self.num_layers)] = db_linear
+        
+        dx_last_linearRelu, dw_last_linearRelu, db_last_linearRelu = None, None, None
+        
+        for i in range(self.num_layers-1, 0, -1):
+            if i == self.num_layers-1:
+                dx_last_linearRelu, dw_last_linearRelu, db_last_linearRelu = Linear_ReLU.backward(dx_linear, 
+                                                                                                  cache_linearRelu_list[i-1])
+            else:
+                dx_last_linearRelu, dw_last_linearRelu, db_last_linearRelu = Linear_ReLU.backward(dx_last_linearRelu, 
+                                                                                                  cache_linearRelu_list[i-1])
+            grads["W"+str(i)] = dw_last_linearRelu + self.reg * self.params["W"+str(i)]
+            grads["b"+str(i)] = db_last_linearRelu
+        
+        
         ###########################################################
         #                   END OF YOUR CODE                      #
         ###########################################################
@@ -543,8 +561,8 @@ def get_three_layer_network_params():
     # TODO: Change weight_scale and learning_rate so your         #
     # model achieves 100% training accuracy within 20 epochs.     #
     ###############################################################
-    weight_scale = 1e-2   # Experiment with this!
-    learning_rate = 1e-4  # Experiment with this!
+    weight_scale = 5e-2   # Experiment with this!
+    learning_rate = .5  # Experiment with this!
     # Replace "pass" statement with your code
     pass
     ################################################################
@@ -558,8 +576,8 @@ def get_five_layer_network_params():
     # TODO: Change weight_scale and learning_rate so your          #
     # model achieves 100% training accuracy within 20 epochs.      #
     ################################################################
-    learning_rate = 2e-3  # Experiment with this!
-    weight_scale = 1e-5   # Experiment with this!
+    weight_scale = 1e-1   # Experiment with this!
+    learning_rate = 1e-1  # Experiment with this!
     # Replace "pass" statement with your code
     pass
     ################################################################
