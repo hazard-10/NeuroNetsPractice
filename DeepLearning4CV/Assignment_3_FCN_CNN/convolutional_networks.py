@@ -51,7 +51,24 @@ class Conv(object):
         # You are NOT allowed to use anything in torch.nn in other places. #
         ####################################################################
         # Replace "pass" statement with your code
-        pass
+        
+        pad, stride = conv_param['pad'], conv_param['stride']
+        out_h = 1 + (x.shape[2] + 2 * conv_param['pad'] - w.shape[2]) // conv_param['stride']
+        out_w = 1 + (x.shape[3] + 2 * conv_param['pad'] - w.shape[3]) // conv_param['stride']
+        out = torch.zeros((x.shape[0], w.shape[0], out_h, out_w), dtype=x.dtype, device=x.device)
+        x_pad = torch.nn.functional.pad(x, (conv_param['pad'], 
+                                            conv_param['pad'], 
+                                            conv_param['pad'], 
+                                            conv_param['pad']))
+        
+        # for each filter, convolve it with the input given stride
+        for i in range(x.shape[0]):
+          cur_image = x_pad[i] # (C, H, W)
+          for rw in range(out_h):
+              for cl in range(out_w):
+                  x_slice = cur_image[:, rw*stride:rw*stride+w.shape[2], cl*stride:cl*stride+w.shape[3]] # (C, HH, WW)
+                  out[i, : , rw, cl] = torch.sum( w * x_slice, dim=(1,2,3) ) + b
+        
         #####################################################################
         #                          END OF YOUR CODE                         #
         #####################################################################
@@ -76,7 +93,38 @@ class Conv(object):
         # TODO: Implement the convolutional backward pass.            #
         ###############################################################
         # Replace "pass" statement with your code
-        pass
+        x, w, b, conv_param=cache
+        stride=conv_param['stride']
+        pad=conv_param['pad']
+
+        dw=torch.zeros_like(w,dtype=w.dtype,device=w.device)
+        dx=torch.zeros_like(x,dtype=x.dtype,device=x.device)
+        db=torch.zeros_like(b,dtype=b.dtype,device=b.device)
+
+        N, C, H, W=x.shape
+        F, C, HH, WW=w.shape
+        
+        padded_x=torch.nn.functional.pad(x, [pad,pad,pad,pad], "constant", 0)
+        dpad_x=torch.zeros_like(padded_x)
+
+        for n in range(N): # N
+          for f in range(F): # F
+            row_index=0
+            
+            while row_index<dout.shape[2]:
+              col_index=0
+              while col_index<dout.shape[3]:
+                corresponding_padded_x=padded_x[n,:,row_index*stride:row_index*stride+HH,col_index*stride:col_index*stride+WW]
+                dw[f]+=corresponding_padded_x*(dout[n,f,row_index,col_index])
+                dpad_x[n,:,row_index*stride:row_index*stride+HH,col_index*stride:col_index*stride+WW]+=w[f]*(dout[n,f,row_index,col_index])
+                col_index+=1
+              row_index+=1
+            
+          db+=torch.sum(dout[n].reshape(F,-1),axis=1)
+          if pad==0:
+            dx[n]=dpad_x[n]
+          else:
+            dx[n] = dpad_x[n,:,pad:-pad, pad:-pad]
         ###############################################################
         #                       END OF YOUR CODE                      #
         ###############################################################
@@ -109,7 +157,15 @@ class MaxPool(object):
         # TODO: Implement the max-pooling forward pass                     #
         ####################################################################
         # Replace "pass" statement with your code
-        pass
+        out_h = 1 + (x.shape[2] - pool_param['pool_height']) // pool_param['stride']
+        out_w = 1 + (x.shape[3] - pool_param['pool_width']) // pool_param['stride']
+        out = torch.zeros((x.shape[0], x.shape[1], out_h, out_w), dtype=x.dtype, device=x.device)
+        for n in range(x.shape[0]):
+          for c in range(x.shape[1]):
+            for rw in range(out_h):
+              for cl in range(out_w):
+                x_slice = x[n, c, rw*pool_param['stride']:rw*pool_param['stride']+pool_param['pool_height'], cl*pool_param['stride']:cl*pool_param['stride']+pool_param['pool_width']]
+                out[n, c, rw, cl] = torch.max(x_slice)
         ####################################################################
         #                         END OF YOUR CODE                         #
         ####################################################################
@@ -131,7 +187,27 @@ class MaxPool(object):
         # TODO: Implement the max-pooling backward pass                     #
         #####################################################################
         # Replace "pass" statement with your code
-        pass
+        x, pool_param=cache
+        N, C, H, W=x.shape
+        ph = pool_param['pool_height']
+        pw = pool_param['pool_width']
+        stride = pool_param['stride']
+
+        H_out = 1 + (H - ph) // stride
+        W_out = 1 + (W - pw) // stride
+        dx=torch.zeros(N,C,H,W,dtype=x.dtype,device=x.device)
+
+        for n in range(N):
+          for row in range(H_out):
+            for col in range(W_out):
+              pooled_area=x[n,:,row*stride:row*stride+ph,col*stride:col*stride+pw].reshape(C,-1)
+              
+              val,ind=torch.max(pooled_area,dim=1)
+              
+              tmp=torch.zeros_like(pooled_area,dtype=x.dtype,device=x.device)
+              tmp[torch.arange(C),ind]=dout[n,:,row,col] # (C,)
+              
+              dx[n,:,row*stride:row*stride+ph,col*stride:col*stride+pw]+=tmp.reshape(C,ph,pw)
         ####################################################################
         #                          END OF YOUR CODE                        #
         ####################################################################
