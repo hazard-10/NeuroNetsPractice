@@ -270,7 +270,31 @@ class ThreeLayerConvNet(object):
         # look at the start of the loss() function to see how that happens.  #
         ######################################################################
         # Replace "pass" statement with your code
-        pass
+        
+        # 1st Conv_Relu_Pool
+        # weight size is (f, c, fz, fz), each calculation mapped to one entry of the output layer
+        # output dim should be 7x16x16 after pooling
+        self.params["W1"] = torch.randn(num_filters, 
+                                        input_dims[0], 
+                                        filter_size, 
+                                        filter_size, dtype=dtype, device=device) * weight_scale
+        
+        self.params["b1"] = torch.zeros(num_filters, dtype=dtype, device=device)
+        
+        
+        # 2nd Linear_Relu
+        # input size is (1792, ), output is (100,)
+        
+        second_linear_input_dim = num_filters*input_dims[1]*input_dims[2] // 4
+        self.params["W2"] = torch.randn(second_linear_input_dim, 
+                                        hidden_dim, dtype=dtype, device=device) * weight_scale
+        self.params["b2"] = torch.randn(hidden_dim, dtype=dtype, device=device)
+        # 3rd Linear
+        # input 100, output 10,
+        
+        self.params["W3"] = torch.randn(hidden_dim, num_classes, dtype=dtype, device=device) * weight_scale
+        self.params["b3"] = torch.randn(num_classes, dtype=dtype, device=device)
+        
         ######################################################################
         #                            END OF YOUR CODE                        #
         ######################################################################
@@ -319,7 +343,15 @@ class ThreeLayerConvNet(object):
         # above                                                              #
         ######################################################################
         # Replace "pass" statement with your code
-        pass
+        
+        conv_relu_pool_out,  conv_relu_pool_cache = Conv_ReLU_Pool.forward(X, W1, b1,
+                                                                           conv_param=conv_param,
+                                                                           pool_param=pool_param)
+        linear_relu_out, linear_relu_cache = Linear_ReLU.forward(conv_relu_pool_out, W2, b2)
+        linear_out, linear_cache = Linear.forward(linear_relu_out, W3, b3)
+        scores, softmax_grad = softmax_loss(linear_out, y)
+        
+        # input to Conv_Relu_pool
         ######################################################################
         #                             END OF YOUR CODE                       #
         ######################################################################
@@ -340,7 +372,9 @@ class ThreeLayerConvNet(object):
         # does not include a factor of 0.5                                 #
         ####################################################################
         # Replace "pass" statement with your code
-        pass
+        loss = scores + 1/2*self.reg*(torch.sum(self.params["W1"]**2) + 
+                                      torch.sum(self.params["W2"]**2) +
+                                      torch.sum(self.params["W3"]**2) )
         ###################################################################
         #                             END OF YOUR CODE                    #
         ###################################################################
