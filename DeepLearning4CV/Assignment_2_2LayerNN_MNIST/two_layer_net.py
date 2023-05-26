@@ -221,7 +221,7 @@ def nn_forward_backward(
     scores -= (scores.max(dim=1)[0]).view(-1,1) # normalize, # N,C
     scores_exp = scores.exp()
     probs = scores_exp / scores_exp.sum(dim = 1, keepdims = True) # N,C / N,1
-    label_probs = probs[torch.arange(N), y]
+    label_probs = probs[torch.arange(N), y] # N,
     neg_log_like = -1 * label_probs.log()
     loss_pre_reg = neg_log_like.sum() / N
     loss_reg = loss_pre_reg + reg*torch.sum(W1*W1)+reg*torch.sum(W2*W2)
@@ -240,23 +240,13 @@ def nn_forward_backward(
     ###########################################################################
     # Replace "pass" statement with your code
     
-    dscores = probs
-    dscores[range(N),y] -= 1
-    dscores /= N
-
-    dscores_w2 = h1.T.matmul(dscores)
-    dscores_b2 = torch.sum(dscores, dim=0)
-
-    jacob = dscores.matmul(W2.T)
-    jacob[h1<=0]=0
-
-    dscore_b1=torch.sum(jacob, dim=0)
-    dscore_w1=X.T.matmul(jacob)
+    d_loss_pre_reg = loss / N   
+    d_neg_log_like = d_loss_pre_reg * torch.ones(neg_log_like.shape) # sum derivative
+    d_label_probs = -1 * (1/label_probs) * d_neg_log_like
+    d_probs_one_hot = torch.nn.functional.one_hot(y, num_classes=10)
+    d_probs = d_probs_one_hot* d_label_probs
+    d_scores_exp = 
     
-    grads['W1']=2*reg*W1 + dscore_w1
-    grads['b1']=dscore_b1
-    grads['W2']=2*reg*W2 + dscores_w2
-    grads['b2']=dscores_b2
     
     ###########################################################################
     #                             END OF YOUR CODE                            #
