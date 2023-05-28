@@ -218,14 +218,21 @@ def nn_forward_backward(
     # (Check Numeric Stability in http://cs231n.github.io/linear-classify/).   #
     ############################################################################
     # Replace "pass" statement with your code
-    scores -= (scores.max(dim=1)[0]).view(-1,1) # normalize, # N,C
-    scores_exp = scores.exp()
-    probs = scores_exp / scores_exp.sum(dim = 1, keepdims = True) # N,C / N,1
-    label_probs = probs[torch.arange(N), y] # N,
-    neg_log_like = -1 * label_probs.log()
-    loss_pre_reg = neg_log_like.sum() / N
-    loss_reg = loss_pre_reg + reg*torch.sum(W1*W1)+reg*torch.sum(W2*W2)
-    loss = loss_reg 
+    
+    scores_max = (scores.max(dim=1)[0]).view(-1,1)
+    scores_norm = scores - scores_max # normalize, # N,C
+    scores_exp = scores_norm.exp()
+    scores_exp_sum = scores_exp.sum(dim = 1, keepdims = True)
+    scores_exp_sum_inv = scores_exp_sum**-1
+    probs = scores_exp * scores_exp_sum_inv # N,C / N,1
+    # label_probs = probs[torch.arange(N), y] # N,
+    # neg_log_like = -1 * label_probs.log()
+    # loss_pre_reg = neg_log_like.sum() / N
+    # loss = loss_pre_reg + reg*torch.sum(W1*W1)+reg*torch.sum(W2*W2)
+    logprobs = probs.log() 
+    loss = -logprobs[range(N), y].mean()
+    loss += reg*torch.sum(W1*W1)+reg*torch.sum(W2*W2)
+    
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -240,12 +247,39 @@ def nn_forward_backward(
     ###########################################################################
     # Replace "pass" statement with your code
     
-    d_loss_pre_reg = loss / N   
-    d_neg_log_like = d_loss_pre_reg * torch.ones(neg_log_like.shape) # sum derivative
-    d_label_probs = -1 * (1/label_probs) * d_neg_log_like
-    d_probs_one_hot = torch.nn.functional.one_hot(y, num_classes=10)
-    d_probs = d_probs_one_hot* d_label_probs
-    d_scores_exp = 
+    d_logprobs = torch.zeros_like(logprobs)
+    d_logprobs[range(N), y] = -1/N
+    
+    d_probs = 1 / probs * d_logprobs
+    
+    d_scores_exp = scores_exp_sum_inv * d_probs
+    d_scores_exp_sum_inv = (scores_exp * d_probs).sum(dim=1, keepdims=True)
+    d_scores_exp_sum = -1 *( scores_exp_sum ** -2)*d_scores_exp_sum_inv
+    d_scores_exp +=  torch.ones_like(scores_exp) * d_scores_exp_sum
+    
+    d_scores_norm = scores_norm.exp() * d_scores_exp
+    d_scores_norm_clone = d_scores_norm.clone()
+    d_scores = d_scores_norm_clone
+    d_scores_max = -1.0 * (d_scores_norm).sum(dim=1, keepdim=True)
+    d_scores += d_scores_max * (scores == scores.max(dim=1, keepdim=True)) 
+    
+    # d_scores = probs
+    # d_scores[range(N),y] -= 1
+    # d_scores /= N
+    
+    d_W2 = h1.T @ d_scores
+    d_b2 = d_scores.sum(dim=0)
+    
+    d_hidden = d_scores @ W2.T
+    d_hidden[h1 <= 0] = 0
+    
+    d_b1 = d_hidden.sum(dim=0) 
+    d_W1 = X.T @ d_hidden
+    
+    grads["W1"]= d_W1 + 2 * reg * W1
+    grads["b1"]= d_b1
+    grads["W2"]= d_W2 + 2 * reg * W2
+    grads["b2"]= d_b2
     
     
     ###########################################################################
