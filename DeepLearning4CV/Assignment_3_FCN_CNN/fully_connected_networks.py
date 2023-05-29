@@ -68,10 +68,6 @@ class Linear(object):
         # TODO: Implement the linear backward pass.      #
         ##################################################
         # Replace "pass" statement with your code
-        dx = dout @ w.T
-        dx = dx.reshape(x.shape)
-        dw = x.reshape(x.shape[0], -1).T @ dout
-        db = dout.sum(axis=0)
         ##################################################
         #                END OF YOUR CODE                #
         ##################################################

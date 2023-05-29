@@ -96,35 +96,8 @@ class Conv(object):
         x, w, b, conv_param=cache
         stride=conv_param['stride']
         pad=conv_param['pad']
-
-        dw=torch.zeros_like(w,dtype=w.dtype,device=w.device)
-        dx=torch.zeros_like(x,dtype=x.dtype,device=x.device)
-        db=torch.zeros_like(b,dtype=b.dtype,device=b.device)
-
-        N, C, H, W=x.shape
-        F, C, HH, WW=w.shape
         
-        padded_x=torch.nn.functional.pad(x, [pad,pad,pad,pad], "constant", 0)
-        dpad_x=torch.zeros_like(padded_x)
-
-        for n in range(N): # N
-          for f in range(F): # F
-            row_index=0
-            
-            while row_index<dout.shape[2]:
-              col_index=0
-              while col_index<dout.shape[3]:
-                corresponding_padded_x=padded_x[n,:,row_index*stride:row_index*stride+HH,col_index*stride:col_index*stride+WW]
-                dw[f]+=corresponding_padded_x*(dout[n,f,row_index,col_index])
-                dpad_x[n,:,row_index*stride:row_index*stride+HH,col_index*stride:col_index*stride+WW]+=w[f]*(dout[n,f,row_index,col_index])
-                col_index+=1
-              row_index+=1
-            
-          db+=torch.sum(dout[n].reshape(F,-1),axis=1)
-          if pad==0:
-            dx[n]=dpad_x[n]
-          else:
-            dx[n] = dpad_x[n,:,pad:-pad, pad:-pad]
+        
         ###############################################################
         #                       END OF YOUR CODE                      #
         ###############################################################
