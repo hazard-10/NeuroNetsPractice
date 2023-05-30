@@ -68,6 +68,9 @@ class Linear(object):
         # TODO: Implement the linear backward pass.      #
         ##################################################
         # Replace "pass" statement with your code
+        dx = (dout @ w.T).reshape(x.shape)
+        dw = (x.reshape(x.shape[0], -1)).T @ dout
+        db = dout.sum(0)
         ##################################################
         #                END OF YOUR CODE                #
         ##################################################
@@ -152,8 +155,9 @@ class Linear_ReLU(object):
         Backward pass for the linear-relu convenience layer
         """
         fc_cache, relu_cache = cache
-        da = ReLU.backward(dout, relu_cache)
-        dx, dw, db = Linear.backward(da, fc_cache)
+        
+        d_relu = ReLU.backward(dout=dout, cache = relu_cache)
+        dx, dw, db = Linear.backward(d_relu, fc_cache)
         return dx, dw, db
 
 

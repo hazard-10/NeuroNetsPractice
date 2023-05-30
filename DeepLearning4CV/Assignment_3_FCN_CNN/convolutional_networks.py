@@ -26,7 +26,7 @@ class Conv(object):
         filter spans all C channels and has height HH and width WW.
 
         Input:
-        - x: Input data of shape (N, C, H, W)
+        - x: Input data of shape     (N, C, H, W)
         - w: Filter weights of shape (F, C, HH, WW)
         - b: Biases, of shape (F,)
         - conv_param: A dictionary with the following keys:
@@ -53,8 +53,8 @@ class Conv(object):
         # Replace "pass" statement with your code
         
         pad, stride = conv_param['pad'], conv_param['stride']
-        out_h = 1 + (x.shape[2] + 2 * conv_param['pad'] - w.shape[2]) // conv_param['stride']
-        out_w = 1 + (x.shape[3] + 2 * conv_param['pad'] - w.shape[3]) // conv_param['stride']
+        out_h = 1 + (x.shape[2] + 2 * pad - w.shape[2]) // conv_param['stride']
+        out_w = 1 + (x.shape[3] + 2 * pad - w.shape[3]) // conv_param['stride']
         out = torch.zeros((x.shape[0], w.shape[0], out_h, out_w), dtype=x.dtype, device=x.device)
         x_pad = torch.nn.functional.pad(x, (conv_param['pad'], 
                                             conv_param['pad'], 
@@ -66,8 +66,11 @@ class Conv(object):
           cur_image = x_pad[i] # (C, H, W)
           for rw in range(out_h):
               for cl in range(out_w):
-                  x_slice = cur_image[:, rw*stride:rw*stride+w.shape[2], cl*stride:cl*stride+w.shape[3]] # (C, HH, WW)
+                  x_slice = cur_image[:, rw*stride:rw*stride+w.shape[2], 
+                                         cl*stride:cl*stride+w.shape[3]] # (C, HH, WW)
                   out[i, : , rw, cl] = torch.sum( w * x_slice, dim=(1,2,3) ) + b
+                  # (F,C,HH,WW * 
+                  #    C,HH,WW)
         
         #####################################################################
         #                          END OF YOUR CODE                         #
@@ -97,6 +100,47 @@ class Conv(object):
         stride=conv_param['stride']
         pad=conv_param['pad']
         
+        
+        out_h = 1 + (x.shape[2] + 2 * pad - w.shape[2]) // conv_param['stride']
+        out_w = 1 + (x.shape[3] + 2 * pad - w.shape[3]) // conv_param['stride']
+        out = torch.zeros((x.shape[0], w.shape[0], out_h, out_w), dtype=x.dtype, device=x.device)
+        x_pad = torch.nn.functional.pad(x, (pad, pad, pad, pad))
+        
+        dx = torch.zeros_like(x)
+        dx_pad = torch.zeros_like(x_pad)
+        dw = torch.zeros_like(w)
+        db = torch.zeros_like(b)
+        F = w.shape[0]
+        '''
+        dout shape is (N, F, out_h, out_w)
+        '''
+        
+        
+        for i in range(x.shape[0]): # for each image
+          for rw in range(out_h): # for each height_index of output
+              for cl in range(out_w):
+                  row_left_index, row_right_index = rw*stride, rw*stride+w.shape[2]
+                  col_left_index, col_right_index = cl*stride, cl*stride+w.shape[3]
+                  x_slice = x_pad[i, :, row_left_index:row_right_index, 
+                                         col_left_index:col_right_index] # (C, HH, WW), where HH WW is weight dim
+                  
+                  dout_slice = dout[i, :, rw, cl]  # F
+                  dout_slice_reshape = dout_slice.reshape(dout_slice.shape[0],1,1,1)
+                  
+                  # out[i, : , rw, cl] = torch.sum( w * x_slice, dim=(1,2,3) ) + b
+                  # local derivative wrt to w 
+                  x_slice_unsqz = x_slice.unsqueeze(0) # (C, HH, WW) --> (1, C, HH, WW)
+                  x_slice_unsqz_repeat= x_slice_unsqz.repeat(F,1,1,1)  # (1, C, HH, WW) copied to 
+                                                                       # (F, C, HH, WW)
+                  dw += (x_slice_unsqz_repeat * dout_slice_reshape)
+                  
+                  w_mul_dout = (w * dout_slice_reshape).sum(0) # F,C,HH,WW -> C,HH,WW
+                  dx_pad[i, :, row_left_index:row_right_index, 
+                        col_left_index:col_right_index] = \
+                                    dx_pad[i, :, row_left_index:row_right_index, 
+                                    col_left_index:col_right_index] + w_mul_dout
+                  db += dout_slice
+        dx = torch.nn.functional.pad(dx_pad, (-pad, -pad, -pad, -pad))
         
         ###############################################################
         #                       END OF YOUR CODE                      #
@@ -160,27 +204,7 @@ class MaxPool(object):
         # TODO: Implement the max-pooling backward pass                     #
         #####################################################################
         # Replace "pass" statement with your code
-        x, pool_param=cache
-        N, C, H, W=x.shape
-        ph = pool_param['pool_height']
-        pw = pool_param['pool_width']
-        stride = pool_param['stride']
-
-        H_out = 1 + (H - ph) // stride
-        W_out = 1 + (W - pw) // stride
-        dx=torch.zeros(N,C,H,W,dtype=x.dtype,device=x.device)
-
-        for n in range(N):
-          for row in range(H_out):
-            for col in range(W_out):
-              pooled_area=x[n,:,row*stride:row*stride+ph,col*stride:col*stride+pw].reshape(C,-1)
-              
-              val,ind=torch.max(pooled_area,dim=1)
-              
-              tmp=torch.zeros_like(pooled_area,dtype=x.dtype,device=x.device)
-              tmp[torch.arange(C),ind]=dout[n,:,row,col] # (C,)
-              
-              dx[n,:,row*stride:row*stride+ph,col*stride:col*stride+pw]+=tmp.reshape(C,ph,pw)
+        
         ####################################################################
         #                          END OF YOUR CODE                        #
         ####################################################################
