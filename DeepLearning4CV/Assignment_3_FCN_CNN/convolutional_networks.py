@@ -181,7 +181,9 @@ class MaxPool(object):
           for c in range(x.shape[1]):
             for rw in range(out_h):
               for cl in range(out_w):
-                x_slice = x[n, c, rw*pool_param['stride']:rw*pool_param['stride']+pool_param['pool_height'], cl*pool_param['stride']:cl*pool_param['stride']+pool_param['pool_width']]
+                x_slice = x[n, c, rw*pool_param['stride']:rw*pool_param['stride']+pool_param['pool_height'], 
+                            cl*pool_param['stride']:cl*pool_param['stride']+pool_param['pool_width']]
+                # print(x_slice.shape)
                 out[n, c, rw, cl] = torch.max(x_slice)
         ####################################################################
         #                         END OF YOUR CODE                         #
@@ -205,13 +207,37 @@ class MaxPool(object):
         #####################################################################
         # Replace "pass" statement with your code
         
+        x, pool_param = cache
+        stride, pool_height = pool_param['stride'], pool_param['pool_height']
+        
+        dx = torch.zeros_like(x)
+        
+        out_h = 1 + (x.shape[2] - pool_param['pool_height']) // pool_param['stride']
+        out_w = 1 + (x.shape[3] - pool_param['pool_width']) // pool_param['stride']
+        for n in range(x.shape[0]):
+          for c in range(x.shape[1]):
+            for rw in range(out_h):
+              for cl in range(out_w):
+                slice_row_left_index, slice_row_right_index, \
+                slice_height_left_index, slice_height_right_index = \
+                  rw * stride, rw * stride + pool_height, \
+                  cl * stride, cl * stride + pool_param['pool_width']
+                  
+                x_slice = x[n, c, rw*pool_param['stride']:rw*pool_param['stride']+pool_param['pool_height'], 
+                            cl*pool_param['stride']:cl*pool_param['stride']+pool_param['pool_width']]
+                max_index = torch.argmax(x_slice)
+                row_index = max_index // x_slice.shape[0]
+                col_index = max_index - x_slice.shape[0] * row_index
+                
+                dx[n, c, slice_row_left_index + row_index, slice_height_left_index+col_index] = dout[n, c, rw, cl]
+        
         ####################################################################
         #                          END OF YOUR CODE                        #
         ####################################################################
         return dx
 
 
-class ThreeLayerConvNet(object):
+class ThreeLayerConvNet(object): 
     """
     A three-layer convolutional network with the following architecture:
     conv - relu - 2x2 max pool - linear - relu - linear - softmax
@@ -248,7 +274,7 @@ class ThreeLayerConvNet(object):
         """
         self.params = {}
         self.reg = reg
-        self.dtype = dtype
+        self.dtype = dtype 
 
         ######################################################################
         # TODO: Initialize weights，biases for the three-layer convolutional #
@@ -346,8 +372,7 @@ class ThreeLayerConvNet(object):
                                                                            pool_param=pool_param)
         linear_relu_out, linear_relu_cache = Linear_ReLU.forward(conv_relu_pool_out, W2, b2)
         linear_out, linear_cache = Linear.forward(linear_relu_out, W3, b3)
-        scores, softmax_grad = softmax_loss(linear_out, y)
-        
+        scores = linear_out
         # input to Conv_Relu_pool
         ######################################################################
         #                             END OF YOUR CODE                       #
@@ -369,9 +394,21 @@ class ThreeLayerConvNet(object):
         # does not include a factor of 0.5                                 #
         ####################################################################
         # Replace "pass" statement with your code
+        scores, softmax_grad = softmax_loss(linear_out, y)
         loss = scores + 1/2*self.reg*(torch.sum(self.params["W1"]**2) + 
                                       torch.sum(self.params["W2"]**2) +
                                       torch.sum(self.params["W3"]**2) )
+        linear_dx, linear_dw, linear_db = Linear.backward(softmax_grad, linear_cache)
+        grads["W3"] = linear_dw
+        grads["b3"] = linear_db
+        linearRelu_dx, linearRelu_dw, linearRelu_db = Linear_ReLU.backward(linear_dx, linear_relu_cache)
+        grads["W2"] = linearRelu_dw
+        grads["b2"] = linearRelu_db
+        conv_dx, conv_dw, conv_db = Conv_ReLU_Pool.backward(linearRelu_dx, conv_relu_pool_cache)
+        grads["W1"] = conv_dw
+        grads["b1"] = conv_db
+        
+        
         ###################################################################
         #                             END OF YOUR CODE                    #
         ###################################################################
@@ -379,7 +416,7 @@ class ThreeLayerConvNet(object):
         return loss, grads
 
 
-class DeepConvNet(object):
+class DeepConvNet(object):  
     """
     A convolutional neural network with an arbitrary number of convolutional
     layers in VGG-Net style. All convolution layers will use kernel size 3 and
@@ -455,7 +492,32 @@ class DeepConvNet(object):
         # initilized to ones and zeros respectively.                        #
         #####################################################################
         # Replace "pass" statement with your code
-        pass
+        
+        # self.params["backnorm"] = batchnorm
+        
+        channel_count, out_height, out_width = input_dims
+        for i in range(len(num_filters)):
+          cur_filter = num_filters[i]
+          cur_dim = (int(cur_filter), int(channel_count), int(out_height), int(out_width))
+          pooling_ = False
+          if len(max_pools) >0 and i in max_pools:
+            pooling_ = True
+            out_height /= 2
+            out_width /= 2
+          
+          self.params[f"W{i}"] = torch.randn(size=cur_dim, dtype=dtype, device=device) * weight_scale
+          self.params[f"b{i}"] = torch.randn(size=cur_dim, dtype=dtype, device=device) 
+          
+        linear_dim = num_filters[-1] * out_height * out_width
+        self.params[f"W{len(num_filters)}"] = torch.randn(int(linear_dim), 
+                                                          int(num_classes), 
+                                                          dtype=dtype, 
+                                                          device=device) * weight_scale
+        self.params[f"b{len(num_filters)}"] = torch.randn(int(num_classes), 
+                                                          dtype=dtype, 
+                                                          device=device) * weight_scale
+        
+            
         ################################################################
         #                      END OF YOUR CODE                        #
         ################################################################
@@ -562,7 +624,31 @@ class DeepConvNet(object):
         # layers, to simplify your implementation.              #
         #########################################################
         # Replace "pass" statement with your code
-        pass
+        
+        """{conv - [batchnorm?] - relu - [pool?]} x (L - 1) - linear"""
+        num_filters = self.num_layers - 1
+        max_pools = self.max_pools
+        cacheList = []
+        last_out = X
+        for i in range(num_filters):
+          cache = []
+          conv_out, c = FastConv.forward(last_out, self.params[f"W{i}"], self.params[f"b{i}"], conv_param)
+          cache.append(c)
+          
+          relu_out, relu_cache = ReLU.forward(conv_out)
+          cache.append(relu_cache)
+          
+          if len(max_pools) >0 and i in max_pools:
+            pool_out, pool_cache = FastMaxPool.forward(relu_out, pool_param)
+            cache.append(pool_cache)
+            last_out = pool_out
+          else:
+            last_out = relu_out
+        
+        scores, linear_cache = Linear.forward(last_out, self.params[f"W{len(num_filters)}"], 
+                                              self.params[f"b{len(num_filters)}"])
+            
+        
         #####################################################
         #                 END OF YOUR CODE                  #
         #####################################################
