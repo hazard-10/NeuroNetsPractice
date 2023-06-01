@@ -5,6 +5,7 @@ WARNING: you SHOULD NOT use ".to()" or ".cuda()" in each implementation block.
 import torch
 from a3_helper import softmax_loss
 from fully_connected_networks import Linear_ReLU, Linear, Solver, adam, ReLU
+import torch.nn as nn
 
 
 def hello_convolutional_networks():
@@ -395,17 +396,17 @@ class ThreeLayerConvNet(object):
         ####################################################################
         # Replace "pass" statement with your code
         scores, softmax_grad = softmax_loss(linear_out, y)
-        loss = scores + 1/2*self.reg*(torch.sum(self.params["W1"]**2) + 
+        loss = scores + self.reg*(torch.sum(self.params["W1"]**2) + 
                                       torch.sum(self.params["W2"]**2) +
                                       torch.sum(self.params["W3"]**2) )
         linear_dx, linear_dw, linear_db = Linear.backward(softmax_grad, linear_cache)
-        grads["W3"] = linear_dw
+        grads["W3"] = linear_dw + 1/2*self.reg*self.params["W3"]
         grads["b3"] = linear_db
         linearRelu_dx, linearRelu_dw, linearRelu_db = Linear_ReLU.backward(linear_dx, linear_relu_cache)
-        grads["W2"] = linearRelu_dw
+        grads["W2"] = linearRelu_dw+ 1/2*self.reg*self.params["W2"]
         grads["b2"] = linearRelu_db
         conv_dx, conv_dw, conv_db = Conv_ReLU_Pool.backward(linearRelu_dx, conv_relu_pool_cache)
-        grads["W1"] = conv_dw
+        grads["W1"] = conv_dw+ 1/2*self.reg*self.params["W1"]
         grads["b1"] = conv_db
         
         
@@ -493,29 +494,43 @@ class DeepConvNet(object):
         #####################################################################
         # Replace "pass" statement with your code
         
-        # self.params["backnorm"] = batchnorm
-        
         channel_count, out_height, out_width = input_dims
+        last_filter = None
         for i in range(len(num_filters)):
           cur_filter = num_filters[i]
-          cur_dim = (int(cur_filter), int(channel_count), int(out_height), int(out_width))
-          pooling_ = False
+          if i != 0:
+            channel_count = last_filter
+          cur_dim = (int(cur_filter), int(channel_count), 3, 3)
           if len(max_pools) >0 and i in max_pools:
-            pooling_ = True
             out_height /= 2
             out_width /= 2
           
-          self.params[f"W{i}"] = torch.randn(size=cur_dim, dtype=dtype, device=device) * weight_scale
-          self.params[f"b{i}"] = torch.randn(size=cur_dim, dtype=dtype, device=device) 
+          if weight_scale != "kaiming":
+            self.params[f"W{i}"] = torch.randn(size=cur_dim, dtype=dtype, device=device) * weight_scale
+          else:
+            self.params[f"W{i}"] = kaiming_initializer(int(channel_count), 
+                                                        int(cur_filter),
+                                                        3,
+                                                        dtype=dtype, 
+                                                        device=device)
+          self.params[f"b{i}"] = torch.randn(size=(cur_filter,), dtype=dtype, device=device) 
+          
+          last_filter = cur_filter
           
         linear_dim = num_filters[-1] * out_height * out_width
-        self.params[f"W{len(num_filters)}"] = torch.randn(int(linear_dim), 
-                                                          int(num_classes), 
-                                                          dtype=dtype, 
-                                                          device=device) * weight_scale
         self.params[f"b{len(num_filters)}"] = torch.randn(int(num_classes), 
                                                           dtype=dtype, 
-                                                          device=device) * weight_scale
+                                                          device=device)
+        if weight_scale != "kaiming":
+          self.params[f"W{len(num_filters)}"] = torch.randn(int(linear_dim), 
+                                                            int(num_classes), 
+                                                            dtype=dtype, 
+                                                            device=device) * weight_scale
+        else:
+          self.params[f"W{len(num_filters)}"] = kaiming_initializer(int(linear_dim), 
+                                                                    int(num_classes),
+                                                                    dtype=dtype, 
+                                                                    device=device)
         
             
         ################################################################
@@ -630,7 +645,9 @@ class DeepConvNet(object):
         max_pools = self.max_pools
         cacheList = []
         last_out = X
+        reg_total = 0
         for i in range(num_filters):
+          # print(f"{i} iteration, input dim {last_out.shape} with weights dim", self.params[f"W{i}"].shape)
           cache = []
           conv_out, c = FastConv.forward(last_out, self.params[f"W{i}"], self.params[f"b{i}"], conv_param)
           cache.append(c)
@@ -638,15 +655,21 @@ class DeepConvNet(object):
           relu_out, relu_cache = ReLU.forward(conv_out)
           cache.append(relu_cache)
           
-          if len(max_pools) >0 and i in max_pools:
+          if i in max_pools:
             pool_out, pool_cache = FastMaxPool.forward(relu_out, pool_param)
             cache.append(pool_cache)
             last_out = pool_out
+            # print(f"{i} pool out: conv dim {conv_out.shape} relu dim{relu_out.shape} pool dim {pool_out.shape}")
           else:
             last_out = relu_out
+            # print(f"{i} relu out")
+          
+          cacheList.append(cache)
+          reg_total += self.reg*(torch.sum(self.params[f"W{i}"]**2))
         
-        scores, linear_cache = Linear.forward(last_out, self.params[f"W{len(num_filters)}"], 
-                                              self.params[f"b{len(num_filters)}"])
+        scores, linear_cache = Linear.forward(last_out, self.params[f"W{num_filters}"], 
+                                              self.params[f"b{num_filters}"])
+        reg_total += self.reg*(torch.sum(self.params[f"W{num_filters}"]**2)) 
             
         
         #####################################################
@@ -669,7 +692,27 @@ class DeepConvNet(object):
         # does not include a factor of 0.5                                #
         ###################################################################
         # Replace "pass" statement with your code
-        pass
+        
+        loss, softmax_grad = softmax_loss(scores, y)
+        loss += reg_total
+      
+        linear_dx, grads[f"W{num_filters}"], grads[f"b{num_filters}"] = \
+              Linear.backward(softmax_grad, linear_cache)
+        grads[f"W{num_filters}"] += 2*self.reg*self.params[f"W{num_filters}"]
+        
+        dout = linear_dx
+        
+        for i in range(num_filters-1, -1, -1):
+          cache = cacheList[i]
+          if i in max_pools:
+              pool_cache = cache[2]
+              dout = FastMaxPool.backward(dout, pool_cache)
+          relu_cache = cache[1]
+          dout = ReLU.backward(dout, relu_cache)
+          conv_cache = cache[0]
+          dout, grads[f"W{i}"], grads[f"b{i}"] = FastConv.backward(dout, conv_cache)
+          grads[f"W{i}"] += 2*self.reg*self.params[f"W{i}"]
+        
         #############################################################
         #                       END OF YOUR CODE                    #
         #############################################################
@@ -678,8 +721,8 @@ class DeepConvNet(object):
 
 
 def find_overfit_parameters():
-    weight_scale = 2e-3   # Experiment with this!
-    learning_rate = 1e-5  # Experiment with this!
+    weight_scale = 5   # Experiment with this!
+    learning_rate = 1e-1  # Experiment with this!
     ###########################################################
     # TODO: Change weight_scale and learning_rate so your     #
     # model achieves 100% training accuracy within 30 epochs. #
@@ -742,7 +785,10 @@ def kaiming_initializer(Din, Dout, K=None, relu=True, device='cpu',
         # and device.                                                     #
         ###################################################################
         # Replace "pass" statement with your code
-        pass
+        weight_scale = (gain / Din )**(1/2)
+        cur_dim = (Din, Dout)
+        weight = torch.randn(size=cur_dim, dtype=dtype, device=device) * weight_scale
+          
         ###################################################################
         #                            END OF YOUR CODE                     #
         ###################################################################
@@ -756,7 +802,10 @@ def kaiming_initializer(Din, Dout, K=None, relu=True, device='cpu',
         # and device.                                                     #
         ###################################################################
         # Replace "pass" statement with your code
-        pass
+        cur_dim = (Dout, Din, K, K)
+        fan_in = Din * K * K
+        weight_scale = (gain / fan_in )**(1/2)
+        weight = torch.randn(size=cur_dim, dtype=dtype, device=device) * weight_scale
         ###################################################################
         #                         END OF YOUR CODE                        #
         ###################################################################
