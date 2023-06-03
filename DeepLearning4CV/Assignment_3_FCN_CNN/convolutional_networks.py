@@ -509,7 +509,7 @@ class DeepConvNet(object):
             self.params[f"W{i}"] = torch.randn(size=cur_dim, dtype=dtype, device=device) * weight_scale
           else:
             self.params[f"W{i}"] = kaiming_initializer(int(channel_count), 
-                                                        int(cur_filter),
+                                                        int(cur_filter ),
                                                         3,
                                                         dtype=dtype, 
                                                         device=device)
@@ -743,7 +743,44 @@ def create_convolutional_solver_instance(data_dict, dtype, device):
     # CIFAR-10 within 60 seconds.                           #
     #########################################################
     # Replace "pass" statement with your code
-    pass
+    
+    # so far best 2e-3, 0.92, num_filter 3,3,3
+    
+    learning_rate = 2e-3
+    learning_rate_decay = 0.93
+    num_epochs = 100
+    batch_size = 128
+    
+    x_train = data_dict['X_train']
+    
+    input_dims = x_train.shape[1:]
+    num_filters = ([8] * 3) + ([32] * 3) + ([128] * 3) 
+    max_pools = [2, 5] 
+    weight_scale = "kaiming"
+    reg = 0.001
+    
+    model = DeepConvNet(
+                 input_dims=input_dims,
+                 num_filters=num_filters,
+                 max_pools= max_pools,
+                 batchnorm=False,
+                 num_classes=10,
+                 weight_scale=weight_scale,
+                 reg=reg,
+                 weight_initializer=None,
+                 dtype=dtype,
+                 device="cuda:0")
+    
+    solver = Solver(model, data_dict,
+                    update_rule= adam,
+                    optim_config={'learning_rate': learning_rate},
+                    lr_decay=learning_rate_decay,
+                    num_epochs=num_epochs, 
+                    batch_size=batch_size,
+                    print_every=100,
+                    device="cuda:0"
+                    )
+    
     #########################################################
     #                  END OF YOUR CODE                     #
     #########################################################
