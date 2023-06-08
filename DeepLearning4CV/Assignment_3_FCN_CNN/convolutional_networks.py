@@ -501,9 +501,9 @@ class DeepConvNet(object):
           if i != 0:
             channel_count = last_filter
           cur_dim = (int(cur_filter), int(channel_count), 3, 3)
-          if len(max_pools) >0 and i in max_pools:
+          if i in max_pools:
             out_height /= 2
-            out_width /= 2
+            out_width /= 2                                        
           
           if weight_scale != "kaiming":
             self.params[f"W{i}"] = torch.randn(size=cur_dim, dtype=dtype, device=device) * weight_scale
@@ -513,17 +513,17 @@ class DeepConvNet(object):
                                                         3,
                                                         dtype=dtype, 
                                                         device=device)
-          self.params[f"b{i}"] = torch.randn(size=(cur_filter,), dtype=dtype, device=device) 
+          self.params[f"b{i}"] = torch.zeros(size=(cur_filter,), dtype=dtype, device=device) 
           
           
           if self.batchnorm:
-            self.params[f"gamma{i}"] = torch.ones(int(channel_count), dtype=dtype, device=device) 
-            self.params[f"beta{i}"] = torch.ones(int(channel_count), dtype=dtype, device=device) 
+            self.params[f"gamma{i}"] = torch.ones(int(cur_filter), dtype=dtype, device=device) 
+            self.params[f"beta{i}"] = torch.zeros(int(cur_filter), dtype=dtype, device=device) 
           
           last_filter = cur_filter
           
         linear_dim = num_filters[-1] * out_height * out_width
-        self.params[f"b{len(num_filters)}"] = torch.randn(int(num_classes), 
+        self.params[f"b{len(num_filters)}"] = torch.zeros(int(num_classes), 
                                                           dtype=dtype, 
                                                           device=device)
         if weight_scale != "kaiming":
@@ -657,35 +657,72 @@ class DeepConvNet(object):
         for i in range(num_filters):
           # print(f"{i} iteration, input dim {last_out.shape} with weights dim", self.params[f"W{i}"].shape)
           cache = []
-          conv_out, c = FastConv.forward(last_out, self.params[f"W{i}"], self.params[f"b{i}"], conv_param)
-          cache.append(c)
           
-          if self.batchnorm:
-            gamma, beta = self.params[f"gamma{i}"], self.params[f"beta{i}"]
-            conv_out, batchNorm_cache = SpatialBatchNorm.forward(conv_out, gamma, beta, self.bn_params[i])
-          
-          relu_out, relu_cache = ReLU.forward(conv_out)
-          cache.append(relu_cache)
-          
-          if self.batchnorm:
-            cache.append(batchNorm_cache)
-          
-          if i in max_pools:
-            pool_out, pool_cache = FastMaxPool.forward(relu_out, pool_param)
-            cache.append(pool_cache)
-            last_out = pool_out
-            # print(f"{i} pool out: conv dim {conv_out.shape} relu dim{relu_out.shape} pool dim {pool_out.shape}")
+          if not self.batchnorm:
+            if i in max_pools:
+              """{conv - relu - pool} x (L - 1) - linear"""
+              last_out, cache = Conv_ReLU_Pool.forward(last_out, 
+                                     self.params[f"W{i}"], 
+                                     self.params[f"b{i}"], 
+                                     conv_param, pool_param)
+            else:
+              """{conv - relu } x (L - 1) - linear"""
+              last_out, cache = Conv_ReLU.forward(last_out, 
+                                     self.params[f"W{i}"], 
+                                     self.params[f"b{i}"], 
+                                     conv_param)
           else:
-            last_out = relu_out
-            # print(f"{i} relu out")
+            gamma, beta = self.params[f"gamma{i}"], self.params[f"beta{i}"]
+            if i in max_pools:
+              """{conv - batchnorm - relu - pool} x (L - 1) - linear"""
+              last_out, cache = Conv_BatchNorm_ReLU_Pool.forward(last_out, 
+                                                            self.params[f"W{i}"], 
+                                                            self.params[f"b{i}"], 
+                                                            gamma, beta,
+                                                            conv_param,
+                                                            self.bn_params[i],
+                                                            pool_param
+                                                            )
+            else:
+              """{conv - batchnorm - relu } x (L - 1) - linear"""
+              last_out, cache = Conv_BatchNorm_ReLU.forward(last_out, 
+                                                      self.params[f"W{i}"], 
+                                                      self.params[f"b{i}"], 
+                                                      gamma, beta,
+                                                      conv_param,
+                                                      self.bn_params[i]
+                                                      )
+            
+          # conv_out, conv_cache = FastConv.forward(last_out, self.params[f"W{i}"], self.params[f"b{i}"], conv_param)
+          # cache.append(conv_cache)
+          
+          # if self.batchnorm:
+          #   conv_out, batchNorm_cache = SpatialBatchNorm.forward(conv_out, gamma, beta, self.bn_params[i])
+          
+          # relu_out, relu_cache = ReLU.forward(conv_out)
+          # cache.append(relu_cache)
+          
+          # if self.batchnorm:
+          #   cache.append(batchNorm_cache)
+          
+          # if i in max_pools:
+          #   pool_out, pool_cache = FastMaxPool.forward(relu_out, pool_param)
+          #   cache.append(pool_cache)
+          #   last_out = pool_out
+          #   # print(f"{i} pool out: conv dim {conv_out.shape} relu dim{relu_out.shape} pool dim {pool_out.shape}")
+          # else:
+          #   last_out = relu_out
+          #   # print(f"{i} relu out")
           
           cacheList.append(cache)
           reg_total += self.reg*(torch.sum(self.params[f"W{i}"]**2))
         
+        
+        # linear layer
         scores, linear_cache = Linear.forward(last_out, self.params[f"W{num_filters}"], 
                                               self.params[f"b{num_filters}"])
-        if not self.batchnorm:
-          reg_total += self.reg*(torch.sum(self.params[f"W{num_filters}"]**2)) 
+        
+        reg_total += self.reg*(torch.sum(self.params[f"W{num_filters}"]**2)) 
             
         
         #####################################################
@@ -714,27 +751,40 @@ class DeepConvNet(object):
       
         linear_dx, grads[f"W{num_filters}"], grads[f"b{num_filters}"] = \
               Linear.backward(softmax_grad, linear_cache)
-        if not self.batchnorm:
-          grads[f"W{num_filters}"] += 2*self.reg*self.params[f"W{num_filters}"]
+        # if not self.batchnorm:
+        grads[f"W{num_filters}"] += 2*self.reg*self.params[f"W{num_filters}"]
         
         dout = linear_dx
         
         for i in range(num_filters-1, -1, -1):
           cache = cacheList[i]
-          if i in max_pools:
-              pool_cache = cache[-1]
-              dout = FastMaxPool.backward(dout, pool_cache)
-          if self.batchnorm :
-            batchCache = None
+          if not self.batchnorm:
             if i in max_pools:
-              batchCache = cache[-2]
+              dout, grads[f"W{i}"], grads[f"b{i}"] = Conv_ReLU_Pool.backward(dout, cache)
             else:
-              batchCache = cache[-1]
-            dout = SpatialBatchNorm.backward(dout, batchCache)
-          relu_cache = cache[1]
-          dout = ReLU.backward(dout, relu_cache)
-          conv_cache = cache[0]
-          dout, grads[f"W{i}"], grads[f"b{i}"] = FastConv.backward(dout, conv_cache)
+              dout, grads[f"W{i}"], grads[f"b{i}"] = Conv_ReLU.backward(dout, cache)
+          else:
+            if i in max_pools:
+              dout, grads[f"W{i}"], grads[f"b{i}"], grads[f'gamma{i}'],grads[f'beta{i}']= Conv_BatchNorm_ReLU_Pool.backward(dout, cache)
+            else:
+              dout, grads[f"W{i}"], grads[f"b{i}"], grads[f'gamma{i}'],grads[f'beta{i}'] = Conv_BatchNorm_ReLU.backward(dout, cache)
+          # if i in max_pools:
+          #     pool_cache = cache[-1]
+          #     dout = FastMaxPool.backward(dout, pool_cache)
+          
+          # relu_cache = cache[1]
+          # dout = ReLU.backward(dout, relu_cache)
+          
+          # if self.batchnorm :
+          #   batchCache = None
+          #   if i in max_pools:
+          #     batchCache = cache[-2]
+          #   else:
+          #     batchCache = cache[-1]
+          #   dout = SpatialBatchNorm.backward(dout, batchCache)
+          # conv_cache = cache[0]
+          # dout, grads[f"W{i}"], grads[f"b{i}"] = FastConv.backward(dout, conv_cache)
+          
           grads[f"W{i}"] += 2*self.reg*self.params[f"W{i}"]
         
         #############################################################
@@ -1108,7 +1158,7 @@ class BatchNorm(object):
 class SpatialBatchNorm(object):
 
     @staticmethod
-    def forward(x, gamma, beta, bn_param):
+    def \f\orward(x, gamma, beta, bn_param):
         """
         Computes the forward pass for spatial batch normalization.
 
