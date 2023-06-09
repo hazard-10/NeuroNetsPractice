@@ -1158,7 +1158,7 @@ class BatchNorm(object):
 class SpatialBatchNorm(object):
 
     @staticmethod
-    def \f\orward(x, gamma, beta, bn_param):
+    def forward(x, gamma, beta, bn_param):
         """
         Computes the forward pass for spatial batch normalization.
 
