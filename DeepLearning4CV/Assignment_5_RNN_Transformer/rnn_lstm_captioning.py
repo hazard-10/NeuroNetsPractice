@@ -91,8 +91,9 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     Run the forward pass for a single timestep of a vanilla RNN that uses a tanh
     activation function.
 
-    The input data has dimension D, the hidden state has dimension H, and we use
-    a minibatch size of N.
+    The input data has dimension D
+    the hidden state has dimension H, 
+    and we use a minibatch size of N.
 
     Args:
         x: Input data for this timestep, of shape (N, D).
@@ -112,7 +113,20 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     # and cache variables respectively.
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+
+    # Wx * X : NxD - DxH -> NxH
+    # Wh * prevh : NxH - HxH -> NxH
+
+    next_h = torch.tanh(x @ Wx + prev_h @ Wh + b)
+    cache = {
+        'x': x,
+        'Wx': Wx,
+        'prev_h': prev_h,
+        'Wh': Wh,
+        'b': b,
+        'next_h': next_h,
+    }
+
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -142,7 +156,13 @@ def rnn_step_backward(dnext_h, cache):
     # terms of the output value from tanh.
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+
+    d_tanh = (1 - cache['next_h'] ** 2) * dnext_h
+    dx = d_tanh @ cache['Wx'].T
+    dprev_h = d_tanh @ cache['Wh'].T
+    dWx = cache['x'].T @ d_tanh
+    dWh = cache['prev_h'].T @ d_tanh
+    db = d_tanh.sum(axis=0)
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################

@@ -7,6 +7,10 @@ import seaborn
 import torch
 
 
+def custom_load_caption_data():
+    return
+
+
 def load_coco_captions(path: str = "./datasets/coco.pt"):
     """
     Download and load serialized COCO data from coco.pt
@@ -38,7 +42,8 @@ def load_coco_captions(path: str = "./datasets/coco.pt"):
     print("Validation images shape: ", data_dict["val_images"].shape)
     print("Validation caption tokens shape: ", data_dict["val_captions"].shape)
     print(
-        "total number of caption tokens: ", len(data_dict["vocab"]["idx_to_token"])
+        "total number of caption tokens: ", len(
+            data_dict["vocab"]["idx_to_token"])
     )
     print(
         "mappings (list) from index to caption token: ",
@@ -88,8 +93,8 @@ def train_captioner(
         start_t = time.time()
         for j in range(iter_per_epoch):
             images, captions = (
-                image_data[j * batch_size : (j + 1) * batch_size],
-                caption_data[j * batch_size : (j + 1) * batch_size],
+                image_data[j * batch_size: (j + 1) * batch_size],
+                caption_data[j * batch_size: (j + 1) * batch_size],
             )
             images = images.to(device)
             captions = captions.to(device)
@@ -257,7 +262,7 @@ def inference(model, inp_exp, inp_exp_pos, out_pos_exp, out_seq_len):
         a_emb_inp = ans_emb + out_pos_exp[:, : y_init.shape[1], :]
         dec_out = model.decoder(a_emb_inp, enc_out, None)
         _, next_word = torch.max(
-            dec_out[0, y_init.shape[1] - 1 : y_init.shape[1]], dim=1
+            dec_out[0, y_init.shape[1] - 1: y_init.shape[1]], dim=1
         )
 
         y_init = torch.cat([y_init, next_word.view(1, 1)], dim=1)
