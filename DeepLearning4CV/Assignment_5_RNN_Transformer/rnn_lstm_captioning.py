@@ -91,9 +91,8 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     Run the forward pass for a single timestep of a vanilla RNN that uses a tanh
     activation function.
 
-    The input data has dimension D
-    the hidden state has dimension H, 
-    and we use a minibatch size of N.
+    The input data has dimension D, the hidden state has dimension H, and we use
+    a minibatch size of N.
 
     Args:
         x: Input data for this timestep, of shape (N, D).
@@ -113,20 +112,7 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     # and cache variables respectively.
     ##########################################################################
     # Replace "pass" statement with your code
-
-    # Wx * X : NxD - DxH -> NxH
-    # Wh * prevh : NxH - HxH -> NxH
-
-    next_h = torch.tanh(x @ Wx + prev_h @ Wh + b)
-    cache = {
-        'x': x,
-        'Wx': Wx,
-        'prev_h': prev_h,
-        'Wh': Wh,
-        'b': b,
-        'next_h': next_h,
-    }
-
+    pass
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -156,13 +142,7 @@ def rnn_step_backward(dnext_h, cache):
     # terms of the output value from tanh.
     ##########################################################################
     # Replace "pass" statement with your code
-
-    d_tanh = (1 - cache['next_h'] ** 2) * dnext_h
-    dx = d_tanh @ cache['Wx'].T
-    dprev_h = d_tanh @ cache['Wh'].T
-    dWx = cache['x'].T @ d_tanh
-    dWh = cache['prev_h'].T @ d_tanh
-    db = d_tanh.sum(axis=0)
+    pass
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -194,21 +174,11 @@ def rnn_forward(x, h0, Wx, Wh, b):
     # above. You can use a for loop to help compute the forward pass.
     ##########################################################################
     # Replace "pass" statement with your code
-
-    cache = []
-    h = h0
-    out_h = torch.zeros(
-        (x.shape[0], x.shape[1], h0.shape[1]), device=x.device, dtype=torch.float64)
-
-    for iter in range(x.shape[1]):
-        thisIterCache = dict()
-        h, thisIterCache = rnn_step_forward(x[:, iter, :], h, Wx, Wh, b)
-        cache.append(thisIterCache)
-        out_h[:, iter] = h
+    pass
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
-    return out_h, cache
+    return h, cache
 
 
 def rnn_backward(dh, cache):
@@ -237,36 +207,7 @@ def rnn_backward(dh, cache):
     # defined above. You can use a for loop to help compute the backward pass.
     ##########################################################################
     # Replace "pass" statement with your code
-
-    N, T, H = dh.shape
-    D = cache[0]['x'].shape[1]
-
-    dx_iter, dprev_h, dWx_iter, dWh_iter, db_iter = None, None, None, None, None
-    dx = torch.zeros((N, T, D),
-                     device=dh.device, dtype=torch.float64)
-    dprev_h = dh[:, -1, :]
-    dWx = torch.zeros((D, H),
-                      device=dh.device, dtype=torch.float64)
-    dWh = torch.zeros((H, H),
-                      device=dh.device, dtype=torch.float64)
-    db = torch.zeros((H,),
-                     device=dh.device, dtype=torch.float64)
-
-    for iter in range(T-1, -1, -1):  # in range of T-1 to 0
-        dx_iter, dprev_h, dWx_iter, dWh_iter, db_iter = rnn_step_backward(
-            dprev_h, cache[iter])
-        # append iter
-        dx[:, iter, :] = dx_iter
-        dh0 = dprev_h
-        dWx += dWx_iter
-        dWh += dWh_iter
-        db += db_iter
-
-        if iter == 0:
-            break
-        else:
-            dprev_h += dh[:, iter-1, :]
-
+    pass
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -344,7 +285,7 @@ class WordEmbedding(nn.Module):
         out: Array of shape (N, T, D) giving word vectors for all input words.
     """
 
-    def __init__(self, vocab_size: int, embed_size: int):  # V, D
+    def __init__(self, vocab_size: int, embed_size: int):
         super().__init__()
 
         # Register parameters
@@ -359,9 +300,7 @@ class WordEmbedding(nn.Module):
         # TODO: Implement the forward pass for word embeddings.
         ######################################################################
         # Replace "pass" statement with your code
-
-        out = self.W_embed[x]
-
+        pass
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -406,11 +345,7 @@ def temporal_softmax_loss(x, y, ignore_index=None):
     # all timesteps and *averaging* across the minibatch.
     ##########################################################################
     # Replace "pass" statement with your code
-
-    loss = torch.nn.functional.cross_entropy(
-        x.permute(0, 2, 1), y, ignore_index=ignore_index, reduction='sum') \
-        / x.shape[0]
-
+    pass
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
